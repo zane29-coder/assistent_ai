@@ -11,6 +11,17 @@ Claude Pro tarifi **kerak emas**. Dastur to'g'ridan-to'g'ri Anthropic API bilan 
 
 Dasturda namuna sifatida **"Google Sheets: #REF! xatolarini tuzatish"** vazifasi tayyor turadi.
 
+## Eng oson yo'l: tayyor .exe (hech narsa o'rnatish shart emas)
+
+1. **[AssistentAI.exe ni yuklab oling](https://github.com/zane29-coder/assistent_ai/releases/download/latest/AssistentAI.exe)**.
+2. Faylni ikki marta bosing. Windows "Windows protected your PC" deb ogohlantirsa, **More info → Run anyway** ni bosing (dastur imzolanmagani uchun shunday chiqadi).
+3. Birinchi ochilganda dastur API kalit olish yo'lini ko'rsatadi: saytda kalit oling, dasturga qo'yib **Saqlash** ni bosing.
+4. Tayyor, **Chat** yoki **Tezkor vazifalar** bo'limidan foydalaning.
+
+Python ham, boshqa dastur ham kerak emas. Sozlamalar va vazifalar `%APPDATA%\AssistentAI` papkasida saqlanadi, shuning uchun .exe ni yangisiga almashtirsangiz ham ular yo'qolmaydi. .exe har safar kod yangilanganda GitHub tomonidan avtomatik qayta yig'iladi.
+
+Quyidagi bo'limlar dasturni manba koddan ishga tushirmoqchi bo'lganlar uchun.
+
 ## Nima kerak
 
 - Windows 10 yoki 11 (macOS va Linux'da ham ishlashi kerak, lekin asosan Windows uchun sozlangan)
@@ -99,6 +110,7 @@ Console'da **Billing → Limits** bo'limida oylik sarf chegarasini qo'yib qo'yis
 
 ```
 main.py                  dasturni ishga tushirish
+.github/workflows/       Windows .exe ni avtomatik yig'ish (PyInstaller)
 install.bat / run.bat    Windows uchun o'rnatish va ishga tushirish
 assistent/gui.py         oyna: Chat, Tezkor vazifalar, Sozlamalar
 assistent/agent.py       Claude bilan ishlash sikli (computer use)

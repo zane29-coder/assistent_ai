@@ -3,17 +3,19 @@
 import queue
 import threading
 import time
+import webbrowser
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from tkinter.scrolledtext import ScrolledText
 from pathlib import Path
 
 from .attachments import AttachmentError, files_to_blocks
-from .config import load_config, save_config
+from .config import CONFIG_PATH, load_config, save_config
 from .tasks_store import load_tasks, new_task, save_tasks
 
 MODELS = ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"]
 EFFORTS = ["low", "medium", "high", "xhigh", "max"]
+API_KEYS_URL = "https://console.anthropic.com/settings/keys"
 
 
 class App:
@@ -53,6 +55,20 @@ class App:
         if not self.cfg.get("api_key"):
             self.nb.select(self.settings_tab)
             self._log("info", "Boshlash uchun 'Sozlamalar' bo'limida Anthropic API kalitini kiriting.")
+            self.root.after(400, self._welcome)
+
+    def _welcome(self):
+        if messagebox.askyesno(
+            "Xush kelibsiz!",
+            "Dastur ishlashi uchun bitta narsa kerak: Anthropic API kalit.\n\n"
+            "1. Hozir ochiladigan saytda ro'yxatdan o'ting.\n"
+            "2. Billing bo'limida balansni to'ldiring (masalan $5).\n"
+            "3. API Keys → Create Key, kalitni nusxalang.\n"
+            "4. Kalitni shu dasturdagi 'Anthropic API kalit' maydoniga qo'yib, 'Saqlash'ni bosing.\n\n"
+            "Saytni hozir ochaymi?",
+        ):
+            webbrowser.open(API_KEYS_URL)
+            self.key_entry.focus_set()
 
     # ------------------------------------------------------------------ Chat
     def _build_chat_tab(self):
@@ -310,11 +326,13 @@ class App:
         row.grid(row=7, column=1, sticky="w", pady=8)
         ttk.Button(row, text="Saqlash", command=self.save_settings).pack(side="left")
         ttk.Button(row, text="API kalitni tekshirish", command=self.test_key).pack(side="left", padx=6)
+        ttk.Button(row, text="API kalit olish (sayt)", command=lambda: webbrowser.open(API_KEYS_URL)).pack(side="left")
 
         tips = ("Maslahatlar:\n"
                 "• API kalitni console.anthropic.com → API Keys bo'limidan olasiz.\n"
                 "• Favqulodda to'xtatish: sichqonchani ekranning chap-yuqori burchagiga olib boring.\n"
-                "• Kichikroq skrinshot va 'low/medium' effort arzonroq ishlaydi.")
+                "• Kichikroq skrinshot va 'low/medium' effort arzonroq ishlaydi.\n"
+                f"• Sozlamalar va vazifalar saqlanadigan papka: {CONFIG_PATH.parent}")
         ttk.Label(tab, text=tips, foreground="#555", justify="left").grid(row=8, column=0, columnspan=3, sticky="w", pady=12)
         tab.columnconfigure(1, weight=1)
 

@@ -2,9 +2,26 @@
 
 import json
 import os
+import sys
 from pathlib import Path
 
-APP_DIR = Path(__file__).resolve().parent.parent
+
+def _data_dir() -> Path:
+    """Sozlamalar saqlanadigan papka.
+
+    .exe ko'rinishida: %APPDATA%\\AssistentAI (yozish ruxsati doim bor).
+    Manba koddan ishga tushirilganda: loyiha papkasi.
+    """
+    if getattr(sys, "frozen", False):
+        base = os.environ.get("APPDATA") or str(Path.home())
+        d = Path(base) / "AssistentAI"
+    else:
+        d = Path(__file__).resolve().parent.parent
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+APP_DIR = _data_dir()
 CONFIG_PATH = APP_DIR / "config.json"
 TASKS_PATH = APP_DIR / "tasks.json"
 

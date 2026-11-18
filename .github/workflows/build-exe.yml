@@ -1,0 +1,53 @@
+name: Windows .exe yig'ish
+
+on:
+  push:
+    branches: [main, claude/project-thread-w352uw]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Kutubxonalarni o'rnatish
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+
+      - name: .exe yig'ish
+        run: pyinstaller --noconfirm --onefile --windowed --name AssistentAI main.py
+
+      - name: .exe ishga tushishini tekshirish
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath dist\AssistentAI.exe -ArgumentList "--selftest" -Wait -PassThru
+          if ($p.ExitCode -ne 0) {
+            if (Test-Path selftest_error.txt) { Get-Content selftest_error.txt }
+            exit 1
+          }
+          Write-Host "Selftest OK"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AssistentAI-windows
+          path: dist/AssistentAI.exe
+
+      - name: "Doimiy yuklab olish havolasini yangilash (release: latest)"
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest dist/AssistentAI.exe \
+            --target "$GITHUB_SHA" --prerelease \
+            --title "Assistent AI (Windows)" \
+            --notes "AssistentAI.exe ni yuklab oling va ikki marta bosing. Windows ogohlantirsa: 'More info' → 'Run anyway'. Commit: $GITHUB_SHA"
