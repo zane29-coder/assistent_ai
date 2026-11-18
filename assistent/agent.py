@@ -8,6 +8,7 @@ tugatguncha yoki savol berguncha shu takrorlanadi.
 import datetime
 import platform
 import threading
+import time
 from typing import Callable
 
 import anthropic
@@ -35,6 +36,8 @@ How to work:
 - Prefer keyboard shortcuts when they are reliable (Ctrl+L for the address bar, Ctrl+F to find, Ctrl+Z to undo, etc.).
 - If something did not work, look at the new screenshot and try a different approach instead of repeating the same action.
 - Use zoom when text is too small to read reliably.
+- Files the user attaches are already included in the conversation (as text, images or PDF documents). Read and analyze them directly from the conversation. Do NOT open them on the computer or search for them in File Explorer, unless the user explicitly asks you to open a file on screen. Use the screen only to carry out the task itself.
+- The user can pause you at any time to use the computer themselves. After a pause you receive a fresh screenshot; the screen may have changed, so re-check before continuing.
 - When the task is finished, reply with a short summary of what you did and anything you could not do.
 
 Safety rules (always follow):
@@ -58,6 +61,8 @@ class Agent:
         self.log = log  # log(kind, text) kind: user/assistant/thinking/action/info/error
         self.messages: list[dict] = []
         self.stop_event = threading.Event()
+        self.pause_event = threading.Event()  # o'rnatilgan = pauza
+        self.fresh_shot = threading.Event()  # keyingi so'rovga yangi skrinshot qo'shish
         self.usage = {"input": 0, "output": 0, "cache_read": 0, "cache_write": 0}
         self.client = None
         self.computer = None
@@ -87,18 +92,63 @@ class Agent:
             today=datetime.date.today().isoformat(),
         )
 
+    # --- pauza / to'xtatish ---
+    def toggle_pause(self) -> bool:
+        if self.pause_event.is_set():
+            self.pause_event.clear()
+            return False
+        self.pause_event.set()
+        return True
+
+    def _checkpoint(self) -> bool:
+        """Pauza bo'lsa kutadi. Pauzadan keyin True qaytaradi (ekran o'zgargan bo'lishi mumkin)."""
+        if not self.pause_event.is_set():
+            return False
+        self.log("status", "Pauza. Davom ettirish uchun tezkor tugmani yana bosing.")
+        self.log("info", "Pauza qilindi.")
+        while self.pause_event.is_set() and not self.stop_event.is_set():
+            time.sleep(0.1)
+        if not self.stop_event.is_set():
+            self.log("info", "Davom etmoqda.")
+        self.fresh_shot.set()
+        return True
+
+    def _attach_fresh_screenshot(self):
+        """Oxirgi (hali yuborilmagan) foydalanuvchi xabariga hozirgi ekran rasmini qo'shadi."""
+        self.fresh_shot.clear()
+        try:
+            shot = self.computer.screenshot_block()
+        except Exception as e:  # noqa: BLE001
+            self.log("error", f"Skrinshot olinmadi: {e}")
+            return
+        last = self.messages[-1]
+        if last["role"] != "user":
+            return
+        if isinstance(last["content"], str):
+            last["content"] = [{"type": "text", "text": last["content"]}]
+        last["content"] = last["content"] + [
+            {"type": "text", "text": "[The user paused you or asked for a fresh look. This is the current screen; it may have changed.]"},
+            shot,
+        ]
+        self.log("action", "Yangi ekran rasmi yuborildi")
+
     # --- asosiy sikl ---
     def run(self, user_content: list[dict]):
         """Foydalanuvchi xabarini qo'shib, Claude vazifani tugatguncha ishlaydi."""
         self.stop_event.clear()
+        self.pause_event.clear()
+        self.fresh_shot.clear()
         self._ensure_ready()
         self.messages.append({"role": "user", "content": user_content})
 
         max_steps = int(self.cfg.get("max_steps", 60))
         for step in range(1, max_steps + 1):
+            self._checkpoint()
             if self.stop_event.is_set():
                 self.log("info", "To'xtatildi.")
                 return
+            if self.fresh_shot.is_set():
+                self._attach_fresh_screenshot()
             self.log("status", f"Claude o'ylamoqda... (qadam {step}/{max_steps})")
             try:
                 resp = self.client.messages.create(
@@ -160,14 +210,22 @@ class Agent:
         results = []
         failed = False
         has_image = False
+        paused = False
         for b in tool_uses:
             toolset = getattr(b, "toolset_name", None)
             base = {"type": "tool_result", "tool_use_id": b.id}
             if toolset:
                 base["toolset_name"] = toolset
-            if failed or self.stop_event.is_set():
-                reason = ("Not executed: the user pressed Stop." if self.stop_event.is_set()
-                          else "Not executed: an earlier computer action in this turn failed.")
+            if not failed and not paused and self._checkpoint():
+                paused = True
+            if failed or paused or self.stop_event.is_set():
+                if self.stop_event.is_set():
+                    reason = "Not executed: the user pressed Stop."
+                elif paused:
+                    reason = ("Not executed: the user paused you and may have changed the screen. "
+                              "Look at the fresh screenshot before continuing.")
+                else:
+                    reason = "Not executed: an earlier computer action in this turn failed."
                 results.append({**base, "is_error": True, "content": reason})
                 continue
             inp = b.input.model_dump(exclude_none=True) if hasattr(b.input, "model_dump") else dict(b.input or {})
@@ -193,7 +251,7 @@ class Agent:
                 results.append({**base, "content": [{"type": "text", "text": out}]})
 
         # Partiyada skrinshot bo'lmasa, oxirgi natijaga yangi skrinshot qo'shib qo'yamiz.
-        if not has_image and not failed and not self.stop_event.is_set():
+        if not has_image and not failed and not paused and not self.stop_event.is_set():
             try:
                 shot = self.computer.screenshot_block()
                 last = results[-1]

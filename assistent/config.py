@@ -38,6 +38,11 @@ DEFAULTS = {
     "hide_window_while_running": True,
     # Har bir amal orasidagi kutish (soniya).
     "action_delay": 0.4,
+    # Tezkor tugmalar (butun Windows bo'ylab ishlaydi).
+    "hotkey_start": "ctrl+alt+s",
+    "hotkey_pause": "ctrl+alt+p",
+    "hotkey_screenshot": "ctrl+alt+r",
+    "hotkey_stop": "ctrl+alt+x",
 }
 
 

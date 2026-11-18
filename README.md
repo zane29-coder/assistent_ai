@@ -58,7 +58,20 @@ API kalitni `ANTHROPIC_API_KEY` muhit o'zgaruvchisi orqali ham berish mumkin. Ka
 2. Dasturning **Chat** bo'limiga yozing: `Chrome'da yangi tab ochib, google.com ga kir va "Toshkent ob-havosi" deb qidir`.
 3. **Yuborish** (yoki Ctrl+Enter) bosing.
 
-Vazifa ishlayotganda asosiy oyna yashiriladi (ekranni to'smasligi uchun), o'ng yuqori burchakda kichik oyna qoladi. Unda Claude hozir nima qilayotgani va **■ To'xtatish** tugmasi bo'ladi. Ish tugagach asosiy oyna qaytadi va barcha qadamlar Chat'da ko'rinadi.
+Vazifa ishlayotganda asosiy oyna yashiriladi (ekranni to'smasligi uchun) va dastur tezkor tugmalar orqali boshqariladi. Ish tugagach qisqa ovoz chiqadi, asosiy oyna qaytadi va barcha qadamlar Chat'da ko'rinadi.
+
+## Tezkor tugmalar
+
+Ular butun Windows bo'ylab ishlaydi: Chrome yoki boshqa dastur ochiq turganda ham, klaviatura lotin yoki kirill tilida bo'lsa ham.
+
+| Tugma | Nima qiladi |
+|---|---|
+| **Ctrl+Alt+S** | Tezkor vazifalar ro'yxatida tanlangan vazifani boshlaydi |
+| **Ctrl+Alt+P** | Pauza. Claude to'xtab turadi, siz sichqoncha va klaviaturadan bemalol foydalanasiz. Yana bosilsa davom etadi va ekranni qaytadan ko'rib oladi |
+| **Ctrl+Alt+R** | Claude'ga hozirgi ekran rasmini yuboradi (pauzada bo'lsa, shu rasm bilan davom ettiradi). Vazifa ishlamayotganda bosilsa, ekran rasmini Chat'ga biriktiradi va oynani ochadi, siz faqat savolingizni yozasiz |
+| **Ctrl+Alt+X** | Vazifani to'xtatadi |
+
+Har bir tugma bosilganda qisqa ovoz eshitiladi. Tugmalarni `%APPDATA%\AssistentAI\config.json` faylidagi `hotkey_start`, `hotkey_pause`, `hotkey_screenshot`, `hotkey_stop` qatorlarida o'zgartirish mumkin (masalan `"ctrl+alt+f9"`).
 
 ### #REF! xatolarini tuzatish
 
@@ -72,7 +85,14 @@ Maslahat: agar jadvalning eski to'g'ri nusxasi yoki ustunlar tavsifi bo'lsa, uni
 
 **+ Yangi vazifa** → nom va head prompt yozing → kerak bo'lsa fayl qo'shing → **Saqlash**. Head promptni qanchalik aniq yozsangiz, natija shunchalik yaxshi bo'ladi: qaysi dastur yoki sayt, qaysi tartibda ishlash kerak, nimalarga tegmaslik kerak va oxirida qanday hisobot berish kerakligini yozing. Vazifalar `tasks.json` faylida saqlanadi.
 
-Biriktirish mumkin bo'lgan fayllar: rasmlar (png, jpg, webp, gif), PDF, Excel (`.xlsx`, formulalari bilan), matnli fayllar (txt, csv, json, md va boshqalar). Boshqa turdagi fayllarning faqat nomi va joylashuvi yuboriladi.
+Biriktirilgan fayl kompyuterda ochilmaydi: uning ichidagi ma'lumot to'g'ridan-to'g'ri Claude'ga yuboriladi. Claude faylni o'zi tahlil qiladi, ekrandan esa faqat vazifaning o'zini bajarish uchun foydalanadi. Qo'llab-quvvatlanadigan fayllar:
+
+- Word (`.docx`), PowerPoint (`.pptx`)
+- Excel (`.xlsx`, `.xlsm` formulalari va qiymatlari bilan, `.xls`), `.csv`
+- PDF, rasmlar (png, jpg, webp, gif, bmp)
+- matnli fayllar (txt, json, md va boshqalar)
+
+Eski `.doc` yoki `.ppt` fayllarni avval Word yoki PowerPoint'da `.docx` / `.pptx` qilib saqlab oling.
 
 ## Narxi haqida
 
@@ -90,7 +110,7 @@ Console'da **Billing → Limits** bo'limida oylik sarf chegarasini qo'yib qo'yis
 ## Xavfsizlik
 
 - Dastur sizning **haqiqiy** kompyuteringizni boshqaradi. Ishlayotganda sichqoncha va klaviaturaga tegmang.
-- **Favqulodda to'xtatish**: sichqonchani ekranning **chap-yuqori burchagiga** olib boring, yoki kichik oynadagi **■ To'xtatish** tugmasini bosing.
+- **Favqulodda to'xtatish**: **Ctrl+Alt+X** ni bosing yoki sichqonchani ekranning **chap-yuqori burchagiga** olib boring.
 - Claude'ga parol, karta raqami kiritmaslik, xarid qilmaslik va so'ralmagan qaytarib bo'lmaydigan ishlarni (o'chirish, xat yuborish) qilishdan oldin sizdan so'rash buyurilgan. Shunday bo'lsa ham muhim ma'lumotlar ochiq turgan oynalarni yopib qo'ying va natijani tekshiring.
 - Muhim jadvallar bilan ishlashdan oldin nusxa oling (Google Sheets'da **File → Make a copy**) yoki keyin **Version history** orqali qaytarishingiz mumkinligini yodda tuting.
 - Ekrandagi har bir rasm Anthropic serverlariga yuboriladi.
@@ -115,6 +135,7 @@ install.bat / run.bat    Windows uchun o'rnatish va ishga tushirish
 assistent/gui.py         oyna: Chat, Tezkor vazifalar, Sozlamalar
 assistent/agent.py       Claude bilan ishlash sikli (computer use)
 assistent/computer.py    skrinshot, sichqoncha, klaviatura boshqaruvi
+assistent/hotkeys.py     butun tizim bo'ylab tezkor tugmalar (Windows)
 assistent/attachments.py biriktirilgan fayllarni tayyorlash
 assistent/tasks_store.py tezkor vazifalarni saqlash (tasks.json)
 assistent/config.py      sozlamalar (config.json)

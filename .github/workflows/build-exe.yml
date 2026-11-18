@@ -24,7 +24,7 @@ jobs:
           pip install -r requirements.txt pyinstaller
 
       - name: .exe yig'ish
-        run: pyinstaller --noconfirm --onefile --windowed --name AssistentAI main.py
+        run: pyinstaller --noconfirm --onefile --windowed --name AssistentAI --collect-data docx --collect-data pptx main.py
 
       - name: .exe ishga tushishini tekshirish
         shell: pwsh

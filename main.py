@@ -7,9 +7,14 @@ def _selftest() -> int:
         import anthropic  # noqa: F401
         import tkinter  # noqa: F401
 
-        from assistent import agent, attachments, computer, gui, tasks_store  # noqa: F401
+        import docx  # noqa: F401
+        import pptx  # noqa: F401
+        import xlrd  # noqa: F401
+
+        from assistent import agent, attachments, computer, gui, hotkeys, tasks_store  # noqa: F401
 
         computer.Computer().screenshot_block()
+        hotkeys.parse("ctrl+alt+s")
         return 0
     except Exception:  # noqa: BLE001
         import traceback

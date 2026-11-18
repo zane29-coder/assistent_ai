@@ -16,6 +16,25 @@ from .tasks_store import load_tasks, new_task, save_tasks
 MODELS = ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"]
 EFFORTS = ["low", "medium", "high", "xhigh", "max"]
 API_KEYS_URL = "https://console.anthropic.com/settings/keys"
+HOTKEY_DEFAULTS = {
+    "start": "ctrl+alt+s",
+    "pause": "ctrl+alt+p",
+    "screenshot": "ctrl+alt+r",
+    "stop": "ctrl+alt+x",
+}
+
+
+def _beep(kind: str):
+    """Oyna yashiringanda ham nima bo'lganini eshitib turish uchun qisqa ovoz."""
+    try:
+        import winsound
+
+        tones = {"start": [(880, 90)], "done": [(660, 90), (880, 120)], "pause": [(440, 150)],
+                 "resume": [(660, 90)], "error": [(220, 200)]}
+        for freq, ms in tones.get(kind, []):
+            winsound.Beep(freq, ms)
+    except Exception:  # noqa: BLE001
+        pass
 
 
 class App:
@@ -28,7 +47,6 @@ class App:
         self.task_files: list[str] = []
         self.current_task_id: str | None = None
         self.worker: threading.Thread | None = None
-        self.mini: tk.Toplevel | None = None
 
         from .agent import Agent  # og'ir kutubxonalar oyna ochilgandan keyin
 
@@ -50,7 +68,10 @@ class App:
         ttk.Label(bar, textvariable=self.status).pack(side="left")
         self.cost_var = tk.StringVar(value="Sarflangan: $0.000")
         ttk.Label(bar, textvariable=self.cost_var).pack(side="right")
+        ttk.Label(root, text="Tezkor tugmalar:  " + self._hotkey_text(), foreground="#555",
+                  wraplength=940, justify="left").pack(fill="x", padx=8, pady=(0, 6))
 
+        self._start_hotkeys()
         self.root.after(100, self._poll_events)
         if not self.cfg.get("api_key"):
             self.nb.select(self.settings_tab)
@@ -261,9 +282,13 @@ class App:
             self._refresh_task_list()
             self.new_task()
 
-    def run_task(self):
+    def run_task(self, from_hotkey: bool = False):
         if self._busy():
             return
+        if from_hotkey and not self.task_name.get().strip() and self.tasks:
+            self.task_list.selection_clear(0, "end")
+            self.task_list.selection_set(0)
+            self._select_task()
         task = self.save_task()
         if not task:
             return
@@ -330,7 +355,8 @@ class App:
 
         tips = ("Maslahatlar:\n"
                 "• API kalitni console.anthropic.com → API Keys bo'limidan olasiz.\n"
-                "• Favqulodda to'xtatish: sichqonchani ekranning chap-yuqori burchagiga olib boring.\n"
+                "• Favqulodda to'xtatish: Ctrl+Alt+X yoki sichqonchani ekranning chap-yuqori burchagiga olib boring.\n"
+                "• Tezkor tugmalarni config.json dagi hotkey_start, hotkey_pause, hotkey_screenshot, hotkey_stop orqali o'zgartirish mumkin.\n"
                 "• Kichikroq skrinshot va 'low/medium' effort arzonroq ishlaydi.\n"
                 f"• Sozlamalar va vazifalar saqlanadigan papka: {CONFIG_PATH.parent}")
         ttk.Label(tab, text=tips, foreground="#555", justify="left").grid(row=8, column=0, columnspan=3, sticky="w", pady=12)
@@ -381,8 +407,8 @@ class App:
         self.run_task_btn.configure(state="disabled")
         self.stop_btn.configure(state="normal")
         if self.cfg.get("hide_window_while_running"):
-            self._show_mini()
             self.root.withdraw()
+        _beep("start")
 
         def work():
             try:
@@ -396,33 +422,102 @@ class App:
         self.worker = threading.Thread(target=work, daemon=True)
         self.worker.start()
 
+    def _running(self) -> bool:
+        return bool(self.worker and self.worker.is_alive())
+
     def stop(self):
+        self.agent.pause_event.clear()
         self.agent.stop_event.set()
         self.status.set("To'xtatilmoqda...")
 
-    def _show_mini(self):
-        m = tk.Toplevel(self.root)
-        m.title("Assistent AI")
-        m.attributes("-topmost", True)
-        m.resizable(False, False)
-        sw = m.winfo_screenwidth()
-        m.geometry(f"320x90+{sw - 340}+10")
-        self.mini_status = tk.StringVar(value="Ishlamoqda...")
-        ttk.Label(m, textvariable=self.mini_status, wraplength=300).pack(fill="x", padx=8, pady=6)
-        ttk.Button(m, text="■ To'xtatish", command=self.stop).pack(pady=(0, 6))
-        m.protocol("WM_DELETE_WINDOW", self.stop)
-        self.mini = m
-
     def _finish(self):
-        if self.mini:
-            self.mini.destroy()
-            self.mini = None
         self.root.deiconify()
         self.root.lift()
         self.send_btn.configure(state="normal")
         self.run_task_btn.configure(state="normal")
         self.stop_btn.configure(state="disabled")
         self.status.set("Tayyor")
+        _beep("done")
+
+    # ------------------------------------------------------------- Hotkeys
+    def _start_hotkeys(self):
+        from .hotkeys import HotkeyManager
+
+        bindings = {name: self.cfg.get(f"hotkey_{name}", default)
+                    for name, default in HOTKEY_DEFAULTS.items()}
+        self.hotkeys = HotkeyManager(
+            bindings,
+            on_hotkey=lambda name: self.events.put(("hotkey", name)),
+            on_error=lambda msg: self.events.put(("error", msg)),
+        )
+        self.hotkeys.start()
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+
+    def _on_close(self):
+        self.agent.stop_event.set()
+        self.hotkeys.stop()
+        self.root.destroy()
+
+    def _hotkey_text(self) -> str:
+        from .hotkeys import pretty
+
+        labels = {"start": "tanlangan tezkor vazifani boshlash",
+                  "pause": "pauza / davom ettirish",
+                  "screenshot": "yangi ekran rasmini yuborish",
+                  "stop": "to'xtatish"}
+        return "   ".join(f"{pretty(self.cfg.get(f'hotkey_{n}', d))} — {labels[n]}"
+                          for n, d in HOTKEY_DEFAULTS.items())
+
+    def _on_hotkey(self, name: str):
+        running = self._running()
+        if name == "start":
+            if running:
+                _beep("error")
+            else:
+                self.run_task(from_hotkey=True)
+        elif name == "pause":
+            if not running:
+                _beep("error")
+                return
+            paused = self.agent.toggle_pause()
+            self.status.set("Pauza" if paused else "Davom etmoqda...")
+            _beep("pause" if paused else "resume")
+        elif name == "screenshot":
+            if running:
+                self.agent.fresh_shot.set()
+                if self.agent.pause_event.is_set():
+                    self.agent.toggle_pause()  # yangi rasm bilan davom ettiramiz
+                _beep("resume")
+            else:
+                self._attach_screenshot_to_chat()
+        elif name == "stop":
+            if running:
+                self.stop()
+                _beep("pause")
+
+    def _attach_screenshot_to_chat(self):
+        """Vazifa ishlamayotganda: hozirgi ekranni chatga biriktirib, oynani ochadi."""
+        import tempfile
+
+        from .computer import Computer
+
+        try:
+            block = Computer(self.cfg.get("screenshot_long_edge", 1366)).screenshot_block()
+            import base64
+
+            path = Path(tempfile.gettempdir()) / f"assistent_ekran_{int(time.time())}.png"
+            path.write_bytes(base64.b64decode(block["source"]["data"]))
+        except Exception as e:  # noqa: BLE001
+            self._log("error", f"Skrinshot olinmadi: {e}")
+            return
+        self.chat_files.append(str(path))
+        self._refresh_chat_files()
+        self.root.deiconify()
+        self.root.lift()
+        self.root.focus_force()
+        self.nb.select(self.chat_tab)
+        self.input.focus_set()
+        _beep("resume")
 
     # ------------------------------------------------------------- Logging
     def _log_from_thread(self, kind: str, text: str):
@@ -436,12 +531,10 @@ class App:
                     self._finish()
                 elif kind == "status":
                     self.status.set(text)
-                    if self.mini:
-                        self.mini_status.set(text)
+                elif kind == "hotkey":
+                    self._on_hotkey(text)
                 else:
                     self._log(kind, text)
-                    if self.mini and kind in ("action", "assistant", "error"):
-                        self.mini_status.set(text[:120])
                 self.cost_var.set(f"Sarflangan: ${self.agent.cost_usd():.3f}")
         except queue.Empty:
             pass
