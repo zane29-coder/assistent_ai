@@ -111,15 +111,43 @@ class ActionError(Exception):
     pass
 
 
+def primary_monitor() -> dict:
+    """Asosiy monitorning joylashuvi va o'lchami (fizik piksellarda)."""
+    with mss.mss() as sct:
+        return dict(sct.monitors[1])
+
+
+def region_to_view(region, mon: dict) -> dict | None:
+    """Saqlangan chegarani (monitorga nisbatan [x, y, w, h]) ekran koordinatalariga o'giradi."""
+    if not region or len(region) != 4:
+        return None
+    x, y, w, h = (int(v) for v in region)
+    x0 = max(0, min(x, mon["width"] - 1))
+    y0 = max(0, min(y, mon["height"] - 1))
+    w = min(w, mon["width"] - x0)
+    h = min(h, mon["height"] - y0)
+    if w < 50 or h < 50:
+        return None
+    return {"left": mon["left"] + x0, "top": mon["top"] + y0, "width": w, "height": h}
+
+
 class Computer:
-    def __init__(self, long_edge: int = 1366, action_delay: float = 0.4):
+    """Ekran bilan ishlash.
+
+    `region` berilsa (maxfiylik chegarasi), AI faqat shu to'rtburchak ichini ko'radi:
+    skrinshot faqat shu qismdan olinadi va sichqoncha amallari undan tashqariga
+    chiqa olmaydi.
+    """
+
+    def __init__(self, long_edge: int = 1366, action_delay: float = 0.4, region=None):
         self.long_edge = max(640, min(int(long_edge), 2576))
         self.action_delay = action_delay
-        with mss.mss() as sct:
-            mon = sct.monitors[1]  # asosiy monitor
-        self.monitor = dict(mon)
-        self.screen_w = mon["width"]
-        self.screen_h = mon["height"]
+        mon = primary_monitor()
+        view = region_to_view(region, mon)
+        self.restricted = view is not None
+        self.monitor = view or mon  # AI ko'radigan maydon
+        self.screen_w = self.monitor["width"]
+        self.screen_h = self.monitor["height"]
         self.scale = min(1.0, self.long_edge / max(self.screen_w, self.screen_h))
         # Vizual tokenlar chegarasi (Opus 4.7+): ceil(w/28)*ceil(h/28) <= 4784
         while True:
@@ -135,11 +163,25 @@ class Computer:
     def to_screen(self, xy) -> tuple[int, int]:
         if not xy or len(xy) != 2:
             raise ActionError("coordinate [x, y] ko'rinishida bo'lishi kerak")
+        w, h = self.img_size()
+        if self.restricted and not (0 <= xy[0] < w and 0 <= xy[1] < h):
+            raise ActionError(
+                f"coordinate {list(xy)} is outside the allowed area. You may only act inside the "
+                f"visible {w}x{h} area (the user's privacy boundary).")
         x = int(round(xy[0] / self.scale)) + self.monitor["left"]
         y = int(round(xy[1] / self.scale)) + self.monitor["top"]
         x = min(max(x, self.monitor["left"]), self.monitor["left"] + self.screen_w - 1)
         y = min(max(y, self.monitor["top"]), self.monitor["top"] + self.screen_h - 1)
         return x, y
+
+    def _cursor_inside(self) -> bool:
+        x, y = pyautogui.position()
+        m = self.monitor
+        return m["left"] <= x < m["left"] + m["width"] and m["top"] <= y < m["top"] + m["height"]
+
+    def _require_cursor_inside(self):
+        if self.restricted and not self._cursor_inside():
+            raise ActionError("the mouse cursor is outside the allowed area; give a coordinate inside it.")
 
     # --- skrinshot ---
     def _grab(self) -> Image.Image:
@@ -223,6 +265,8 @@ class Computer:
         if name == "zoom":
             return [self.zoom_block(inp.get("region"))]
         if name == "cursor_position":
+            if self.restricted and not self._cursor_inside():
+                return "The cursor is outside the allowed area."
             x, y = pyautogui.position()
             ix = round((x - self.monitor["left"]) * self.scale)
             iy = round((y - self.monitor["top"]) * self.scale)
@@ -237,6 +281,7 @@ class Computer:
                     x, y = self.to_screen(inp["coordinate"])
                     pyautogui.click(x, y, clicks=clicks, interval=0.08, button=button)
                 else:
+                    self._require_cursor_inside()
                     pyautogui.click(clicks=clicks, interval=0.08, button=button)
 
             self._with_modifiers(inp.get("text"), do)
@@ -255,6 +300,7 @@ class Computer:
             x, y = self.to_screen(inp.get("coordinate"))
             pyautogui.moveTo(x, y, duration=0.1)
         elif name == "left_mouse_down":
+            self._require_cursor_inside()
             pyautogui.mouseDown()
         elif name == "left_mouse_up":
             pyautogui.mouseUp()
@@ -266,6 +312,8 @@ class Computer:
                 if inp.get("coordinate"):
                     x, y = self.to_screen(inp["coordinate"])
                     pyautogui.moveTo(x, y)
+                else:
+                    self._require_cursor_inside()
                 if direction in ("up", "down"):
                     pyautogui.scroll((120 if direction == "up" else -120) * amount)
                 else:

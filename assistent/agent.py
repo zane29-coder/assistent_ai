@@ -27,8 +27,9 @@ PRICES = {
 SYSTEM_TEMPLATE = """You are a desktop assistant that operates the user's real computer through the computer toolset (screenshots, mouse and keyboard).
 
 Environment:
-- OS: {os_name}. Screenshots you receive are {img_w}x{img_h} pixels; give every coordinate in that pixel space.
-- Today's date: {today}.
+- OS: {os_name}.
+- Give every coordinate in the pixel space of the latest screenshot. The size of the screenshots and today's date are stated in a "[Screen info]" note at the start of each user request; if the size changes, use the new size.
+- The user may set a privacy boundary: then you only see a rectangular part of the screen and mouse actions outside it are blocked. Work only inside what you can see; never try to reach outside it, and if the task needs something outside, tell the user to move or enlarge the boundary (Ctrl+Alt+L).
 - The user's main browser is Google Chrome. If a task needs a website, use Chrome (open it from the taskbar/Start menu if needed).
 
 How to work:
@@ -81,16 +82,22 @@ class Agent:
         if not key:
             raise RuntimeError("API kalit kiritilmagan. 'Sozlamalar' bo'limida API kalitni kiriting.")
         self.client = anthropic.Anthropic(api_key=key, max_retries=4)
-        self.computer = Computer(self.cfg.get("screenshot_long_edge", 1366), self.cfg.get("action_delay", 0.4))
+        self.computer = Computer(self.cfg.get("screenshot_long_edge", 1366), self.cfg.get("action_delay", 0.4),
+                                 region=self.cfg.get("privacy_region"))
 
     def _system(self) -> str:
+        # O'zgarmas bo'lishi kerak (kesh va oldingi fikrlash bloklari buzilmasligi uchun);
+        # o'zgaruvchan ma'lumot har so'rov boshidagi "[Screen info]" izohida yuboriladi.
+        return SYSTEM_TEMPLATE.format(os_name=f"{platform.system()} {platform.release()}")
+
+    def _screen_info(self) -> dict:
         w, h = self.computer.img_size()
-        return SYSTEM_TEMPLATE.format(
-            os_name=f"{platform.system()} {platform.release()}",
-            img_w=w,
-            img_h=h,
-            today=datetime.date.today().isoformat(),
-        )
+        if self.computer.restricted:
+            area = (f"Privacy boundary is ON: you see only the part of the screen the user selected. "
+                    f"Screenshots are {w}x{h} pixels; anything outside is hidden and mouse actions there are blocked.")
+        else:
+            area = f"You see the whole primary screen. Screenshots are {w}x{h} pixels."
+        return {"type": "text", "text": f"[Screen info] {area} Today's date: {datetime.date.today().isoformat()}."}
 
     # --- pauza / to'xtatish ---
     def toggle_pause(self) -> bool:
@@ -139,7 +146,7 @@ class Agent:
         self.pause_event.clear()
         self.fresh_shot.clear()
         self._ensure_ready()
-        self.messages.append({"role": "user", "content": user_content})
+        self.messages.append({"role": "user", "content": [self._screen_info()] + list(user_content)})
 
         max_steps = int(self.cfg.get("max_steps", 60))
         for step in range(1, max_steps + 1):

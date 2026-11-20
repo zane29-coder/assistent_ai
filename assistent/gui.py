@@ -21,6 +21,7 @@ HOTKEY_DEFAULTS = {
     "pause": "ctrl+alt+p",
     "screenshot": "ctrl+alt+r",
     "stop": "ctrl+alt+x",
+    "region": "ctrl+alt+l",
 }
 
 
@@ -38,7 +39,7 @@ def _beep(kind: str):
 
 
 class App:
-    def __init__(self, root: tk.Tk):
+    def __init__(self, root: tk.Tk, selftest: bool = False):
         self.root = root
         self.cfg = load_config()
         self.tasks = load_tasks()
@@ -71,12 +72,18 @@ class App:
         ttk.Label(root, text="Tezkor tugmalar:  " + self._hotkey_text(), foreground="#555",
                   wraplength=940, justify="left").pack(fill="x", padx=8, pady=(0, 6))
 
+        from .region import BorderOverlay
+
+        self._selecting = False
+        self.border = BorderOverlay(root)
+        self._apply_region()
         self._start_hotkeys()
         self.root.after(100, self._poll_events)
         if not self.cfg.get("api_key"):
             self.nb.select(self.settings_tab)
             self._log("info", "Boshlash uchun 'Sozlamalar' bo'limida Anthropic API kalitini kiriting.")
-            self.root.after(400, self._welcome)
+            if not selftest:
+                self.root.after(400, self._welcome)
 
     def _welcome(self):
         if messagebox.askyesno(
@@ -353,13 +360,25 @@ class App:
         ttk.Button(row, text="API kalitni tekshirish", command=self.test_key).pack(side="left", padx=6)
         ttk.Button(row, text="API kalit olish (sayt)", command=lambda: webbrowser.open(API_KEYS_URL)).pack(side="left")
 
+        reg = ttk.LabelFrame(tab, text="Maxfiylik chegarasi (Ctrl+Alt+L)", padding=8)
+        reg.grid(row=8, column=0, columnspan=3, sticky="we", pady=(4, 0))
+        self.region_var = tk.StringVar(value="")
+        ttk.Label(reg, text="AI faqat belgilangan to'rtburchak ichini ko'radi va sichqonchani faqat shu yerda "
+                            "boshqaradi. Tashqaridagi hech narsa unga yuborilmaydi.",
+                  wraplength=700, justify="left").pack(anchor="w")
+        ttk.Label(reg, textvariable=self.region_var, foreground="#1a4fa0").pack(anchor="w", pady=4)
+        rrow = ttk.Frame(reg)
+        rrow.pack(anchor="w")
+        ttk.Button(rrow, text="Chegarani belgilash", command=self.choose_region).pack(side="left")
+        ttk.Button(rrow, text="Olib tashlash", command=self.clear_region).pack(side="left", padx=6)
+
         tips = ("Maslahatlar:\n"
                 "• API kalitni console.anthropic.com → API Keys bo'limidan olasiz.\n"
                 "• Favqulodda to'xtatish: Ctrl+Alt+X yoki sichqonchani ekranning chap-yuqori burchagiga olib boring.\n"
-                "• Tezkor tugmalarni config.json dagi hotkey_start, hotkey_pause, hotkey_screenshot, hotkey_stop orqali o'zgartirish mumkin.\n"
+                "• Tezkor tugmalarni config.json dagi hotkey_start, hotkey_pause, hotkey_screenshot, hotkey_stop, hotkey_region orqali o'zgartirish mumkin.\n"
                 "• Kichikroq skrinshot va 'low/medium' effort arzonroq ishlaydi.\n"
                 f"• Sozlamalar va vazifalar saqlanadigan papka: {CONFIG_PATH.parent}")
-        ttk.Label(tab, text=tips, foreground="#555", justify="left").grid(row=8, column=0, columnspan=3, sticky="w", pady=12)
+        ttk.Label(tab, text=tips, foreground="#555", justify="left").grid(row=9, column=0, columnspan=3, sticky="w", pady=12)
         tab.columnconfigure(1, weight=1)
 
     def save_settings(self):
@@ -439,6 +458,60 @@ class App:
         self.status.set("Tayyor")
         _beep("done")
 
+    # ------------------------------------------------------ Privacy region
+    def choose_region(self):
+        if self._running() or self._selecting:
+            return
+        from .computer import primary_monitor
+        from .region import select_region
+
+        self._selecting = True
+        was_visible = self.root.state() != "withdrawn"
+        self.border.hide()
+        self.root.withdraw()
+
+        def done(result):
+            self._selecting = False
+            if result != "cancel":
+                self.cfg["privacy_region"] = result
+                save_config(self.cfg)
+            self._apply_region()
+            if was_visible:
+                self.root.deiconify()
+            if result == "cancel":
+                return
+            if result:
+                self._log("info", "Maxfiylik chegarasi o'rnatildi. AI endi faqat qizil chiziq ichini ko'radi.")
+            else:
+                self._log("info", "Maxfiylik chegarasi olib tashlandi. AI butun ekranni ko'radi.")
+            _beep("resume")
+
+        # Oyna yashirilishiga ulgurishi uchun biroz kutamiz.
+        self.root.after(250, lambda: select_region(self.root, primary_monitor(),
+                                                   self.cfg.get("privacy_region"), done))
+
+    def clear_region(self):
+        if self._running():
+            return
+        self.cfg["privacy_region"] = None
+        save_config(self.cfg)
+        self._apply_region()
+        self._log("info", "Maxfiylik chegarasi olib tashlandi. AI butun ekranni ko'radi.")
+
+    def _apply_region(self):
+        """Saqlangan chegarani ekranda qizil chiziq bilan ko'rsatadi."""
+        from .computer import primary_monitor, region_to_view
+
+        mon = primary_monitor()
+        view = region_to_view(self.cfg.get("privacy_region"), mon)
+        if view:
+            self.border.show(view, mon)
+            self.region_var.set(f"Yoqilgan: {view['width']}x{view['height']} px "
+                                f"(chap-yuqori burchagi {view['left']}, {view['top']})")
+        else:
+            self.border.hide()
+            self.region_var.set("O'chirilgan — AI butun ekranni ko'radi")
+
     # ------------------------------------------------------------- Hotkeys
     def _start_hotkeys(self):
         from .hotkeys import HotkeyManager
@@ -456,6 +529,7 @@ class App:
     def _on_close(self):
         self.agent.stop_event.set()
         self.hotkeys.stop()
+        self.border.hide()
         self.root.destroy()
 
     def _hotkey_text(self) -> str:
@@ -464,7 +538,8 @@ class App:
         labels = {"start": "tanlangan tezkor vazifani boshlash",
                   "pause": "pauza / davom ettirish",
                   "screenshot": "yangi ekran rasmini yuborish",
-                  "stop": "to'xtatish"}
+                  "stop": "to'xtatish",
+                  "region": "AI ko'radigan joyni belgilash"}
         return "   ".join(f"{pretty(self.cfg.get(f'hotkey_{n}', d))} — {labels[n]}"
                           for n, d in HOTKEY_DEFAULTS.items())
 
@@ -494,6 +569,11 @@ class App:
             if running:
                 self.stop()
                 _beep("pause")
+        elif name == "region":
+            if running:
+                _beep("error")
+            else:
+                self.choose_region()
 
     def _attach_screenshot_to_chat(self):
         """Vazifa ishlamayotganda: hozirgi ekranni chatga biriktirib, oynani ochadi."""
@@ -502,7 +582,8 @@ class App:
         from .computer import Computer
 
         try:
-            block = Computer(self.cfg.get("screenshot_long_edge", 1366)).screenshot_block()
+            block = Computer(self.cfg.get("screenshot_long_edge", 1366),
+                             region=self.cfg.get("privacy_region")).screenshot_block()
             import base64
 
             path = Path(tempfile.gettempdir()) / f"assistent_ekran_{int(time.time())}.png"
@@ -551,6 +632,8 @@ class App:
 
 
 def main():
+    from . import computer  # noqa: F401  (Windows DPI sozlamasi Tk oynasidan oldin o'rnatilishi kerak)
+
     root = tk.Tk()
     try:
         ttk.Style().theme_use("vista")

@@ -70,6 +70,7 @@ Ular butun Windows bo'ylab ishlaydi: Chrome yoki boshqa dastur ochiq turganda ha
 | **Ctrl+Alt+P** | Pauza. Claude to'xtab turadi, siz sichqoncha va klaviaturadan bemalol foydalanasiz. Yana bosilsa davom etadi va ekranni qaytadan ko'rib oladi |
 | **Ctrl+Alt+R** | Claude'ga hozirgi ekran rasmini yuboradi (pauzada bo'lsa, shu rasm bilan davom ettiradi). Vazifa ishlamayotganda bosilsa, ekran rasmini Chat'ga biriktiradi va oynani ochadi, siz faqat savolingizni yozasiz |
 | **Ctrl+Alt+X** | Vazifani to'xtatadi |
+| **Ctrl+Alt+L** | Maxfiylik chegarasi: AI ko'rishi mumkin bo'lgan joyni belgilash (pastga qarang) |
 
 Har bir tugma bosilganda qisqa ovoz eshitiladi. Tugmalarni `%APPDATA%\AssistentAI\config.json` faylidagi `hotkey_start`, `hotkey_pause`, `hotkey_screenshot`, `hotkey_stop` qatorlarida o'zgartirish mumkin (masalan `"ctrl+alt+f9"`).
 
@@ -93,6 +94,22 @@ Biriktirilgan fayl kompyuterda ochilmaydi: uning ichidagi ma'lumot to'g'ridan-to
 - matnli fayllar (txt, json, md va boshqalar)
 
 Eski `.doc` yoki `.ppt` fayllarni avval Word yoki PowerPoint'da `.docx` / `.pptx` qilib saqlab oling.
+
+## Maxfiylik chegarasi (Ctrl+Alt+L)
+
+Ekranda shaxsiy ma'lumot (xabarlar, bank, boshqa oynalar) bo'lsa, AI'ga faqat kerakli qismni ko'rsating:
+
+1. **Ctrl+Alt+L** ni bosing (yoki **Sozlamalar → Chegarani belgilash**). Ekran xiralashadi.
+2. Sichqoncha bilan AI ishlashi kerak bo'lgan joyni to'rtburchak qilib chizing va qo'yib yuboring.
+3. Shu joy atrofida **qizil chiziq** paydo bo'ladi va u doim ko'rinib turadi.
+
+Shundan keyin:
+
+- AI'ga yuboriladigan har bir ekran rasmi **faqat qizil chiziq ichidan** olinadi. Tashqaridagi narsa umuman suratga olinmaydi va hech qayerga yuborilmaydi.
+- Sichqoncha bilan bosish, sudrash va aylantirish faqat chiziq ichida bajariladi. AI tashqaridagi joyni bosmoqchi bo'lsa, dastur buni rad etadi.
+- Chegara saqlanib qoladi. O'zgartirish uchun yana Ctrl+Alt+L bosib, qaytadan chizing. Olib tashlash uchun Ctrl+Alt+L, keyin **Delete** (yoki Sozlamalarda **Olib tashlash**). **Esc** bekor qiladi.
+
+Bilish kerak: klaviatura chegara bilan cheklanmaydi. AI yozgan matn yoki bosgan tugma (masalan Ctrl+W) hozir faol turgan oynaga boradi. Shuning uchun ish boshlashdan oldin kerakli oyna (masalan Chrome) chegara ichida va faol bo'lsin.
 
 ## Narxi haqida
 
@@ -136,6 +153,7 @@ assistent/gui.py         oyna: Chat, Tezkor vazifalar, Sozlamalar
 assistent/agent.py       Claude bilan ishlash sikli (computer use)
 assistent/computer.py    skrinshot, sichqoncha, klaviatura boshqaruvi
 assistent/hotkeys.py     butun tizim bo'ylab tezkor tugmalar (Windows)
+assistent/region.py      maxfiylik chegarasini chizish va qizil chiziq
 assistent/attachments.py biriktirilgan fayllarni tayyorlash
 assistent/tasks_store.py tezkor vazifalarni saqlash (tasks.json)
 assistent/config.py      sozlamalar (config.json)

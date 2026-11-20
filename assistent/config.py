@@ -43,6 +43,9 @@ DEFAULTS = {
     "hotkey_pause": "ctrl+alt+p",
     "hotkey_screenshot": "ctrl+alt+r",
     "hotkey_stop": "ctrl+alt+x",
+    "hotkey_region": "ctrl+alt+l",
+    # Maxfiylik chegarasi: [x, y, kenglik, balandlik] asosiy monitorga nisbatan, yoki null.
+    "privacy_region": None,
 }
 
 
