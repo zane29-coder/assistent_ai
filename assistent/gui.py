@@ -22,6 +22,7 @@ HOTKEY_DEFAULTS = {
     "screenshot": "ctrl+alt+r",
     "stop": "ctrl+alt+x",
     "region": "ctrl+alt+l",
+    "border": "ctrl+alt+h",
 }
 
 
@@ -75,6 +76,7 @@ class App:
         from .region import BorderOverlay
 
         self._selecting = False
+        self._flash_after = None
         self.border = BorderOverlay(root)
         self._apply_region()
         self._start_hotkeys()
@@ -371,11 +373,15 @@ class App:
         rrow.pack(anchor="w")
         ttk.Button(rrow, text="Chegarani belgilash", command=self.choose_region).pack(side="left")
         ttk.Button(rrow, text="Olib tashlash", command=self.clear_region).pack(side="left", padx=6)
+        self.border_var = tk.BooleanVar(value=bool(self.cfg.get("show_region_border")))
+        ttk.Checkbutton(reg, text="Qizil chiziqni ekranda ko'rsatish (Ctrl+Alt+H). Yashirilsa ham AI faqat shu joyni ko'radi.",
+                        variable=self.border_var,
+                        command=lambda: self.toggle_border(self.border_var.get())).pack(anchor="w", pady=(6, 0))
 
         tips = ("Maslahatlar:\n"
                 "• API kalitni console.anthropic.com → API Keys bo'limidan olasiz.\n"
                 "• Favqulodda to'xtatish: Ctrl+Alt+X yoki sichqonchani ekranning chap-yuqori burchagiga olib boring.\n"
-                "• Tezkor tugmalarni config.json dagi hotkey_start, hotkey_pause, hotkey_screenshot, hotkey_stop, hotkey_region orqali o'zgartirish mumkin.\n"
+                "• Tezkor tugmalarni config.json dagi hotkey_start, hotkey_pause, hotkey_screenshot, hotkey_stop, hotkey_region, hotkey_border orqali o'zgartirish mumkin.\n"
                 "• Kichikroq skrinshot va 'low/medium' effort arzonroq ishlaydi.\n"
                 f"• Sozlamalar va vazifalar saqlanadigan papka: {CONFIG_PATH.parent}")
         ttk.Label(tab, text=tips, foreground="#555", justify="left").grid(row=9, column=0, columnspan=3, sticky="w", pady=12)
@@ -475,7 +481,7 @@ class App:
             if result != "cancel":
                 self.cfg["privacy_region"] = result
                 save_config(self.cfg)
-            self._apply_region()
+            self._apply_region(flash=True)
             if was_visible:
                 self.root.deiconify()
             if result == "cancel":
@@ -498,19 +504,47 @@ class App:
         self._apply_region()
         self._log("info", "Maxfiylik chegarasi olib tashlandi. AI butun ekranni ko'radi.")
 
-    def _apply_region(self):
-        """Saqlangan chegarani ekranda qizil chiziq bilan ko'rsatadi."""
+    def _apply_region(self, flash: bool = False):
+        """Chegara holatini yangilaydi. Qizil chiziq faqat yoqilgan bo'lsa ko'rinadi.
+
+        Chiziq ko'rinmasa ham cheklov ishlayveradi: AI baribir faqat shu maydonni ko'radi.
+        flash=True: chiziq yashirin bo'lsa ham 3 soniya ko'rsatib qo'yadi (yangi chizilganda).
+        """
         from .computer import primary_monitor, region_to_view
 
+        if self._flash_after:
+            self.root.after_cancel(self._flash_after)
+            self._flash_after = None
         mon = primary_monitor()
         view = region_to_view(self.cfg.get("privacy_region"), mon)
+        visible = bool(self.cfg.get("show_region_border"))
+        self.border_var.set(visible)
         if view:
-            self.border.show(view, mon)
+            if visible or flash:
+                self.border.show(view, mon)
+            else:
+                self.border.hide()
+            if flash and not visible:
+                self._flash_after = self.root.after(3000, self._apply_region)
             self.region_var.set(f"Yoqilgan: {view['width']}x{view['height']} px "
-                                f"(chap-yuqori burchagi {view['left']}, {view['top']})")
+                                f"(chap-yuqori burchagi {view['left']}, {view['top']}). "
+                                f"Qizil chiziq: {'ko`rinadi' if visible else 'yashirin'}".replace("`", "'"))
         else:
             self.border.hide()
             self.region_var.set("O'chirilgan — AI butun ekranni ko'radi")
+
+    def toggle_border(self, value: bool | None = None):
+        """Faqat qizil chiziqni ko'rsatadi/yashiradi; cheklov o'zgarmaydi."""
+        if not self.cfg.get("privacy_region"):
+            self._log("info", "Avval Ctrl+Alt+L bilan AI ko'radigan joyni belgilang.")
+            _beep("error")
+            self.border_var.set(False)
+            return
+        new = (not self.cfg.get("show_region_border")) if value is None else bool(value)
+        self.cfg["show_region_border"] = new
+        save_config(self.cfg)
+        self._apply_region()
+        _beep("resume" if new else "pause")
 
     # ------------------------------------------------------------- Hotkeys
     def _start_hotkeys(self):
@@ -539,7 +573,8 @@ class App:
                   "pause": "pauza / davom ettirish",
                   "screenshot": "yangi ekran rasmini yuborish",
                   "stop": "to'xtatish",
-                  "region": "AI ko'radigan joyni belgilash"}
+                  "region": "AI ko'radigan joyni belgilash",
+                  "border": "qizil chiziqni ko'rsatish / yashirish"}
         return "   ".join(f"{pretty(self.cfg.get(f'hotkey_{n}', d))} — {labels[n]}"
                           for n, d in HOTKEY_DEFAULTS.items())
 
@@ -569,6 +604,8 @@ class App:
             if running:
                 self.stop()
                 _beep("pause")
+        elif name == "border":
+            self.toggle_border()
         elif name == "region":
             if running:
                 _beep("error")

@@ -44,6 +44,9 @@ DEFAULTS = {
     "hotkey_screenshot": "ctrl+alt+r",
     "hotkey_stop": "ctrl+alt+x",
     "hotkey_region": "ctrl+alt+l",
+    "hotkey_border": "ctrl+alt+h",
+    # Qizil chegara chizig'i ekranda ko'rinsinmi (cheklovning o'ziga ta'sir qilmaydi).
+    "show_region_border": False,
     # Maxfiylik chegarasi: [x, y, kenglik, balandlik] asosiy monitorga nisbatan, yoki null.
     "privacy_region": None,
 }

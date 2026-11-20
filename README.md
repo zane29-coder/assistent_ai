@@ -71,6 +71,7 @@ Ular butun Windows bo'ylab ishlaydi: Chrome yoki boshqa dastur ochiq turganda ha
 | **Ctrl+Alt+R** | Claude'ga hozirgi ekran rasmini yuboradi (pauzada bo'lsa, shu rasm bilan davom ettiradi). Vazifa ishlamayotganda bosilsa, ekran rasmini Chat'ga biriktiradi va oynani ochadi, siz faqat savolingizni yozasiz |
 | **Ctrl+Alt+X** | Vazifani to'xtatadi |
 | **Ctrl+Alt+L** | Maxfiylik chegarasi: AI ko'rishi mumkin bo'lgan joyni belgilash (pastga qarang) |
+| **Ctrl+Alt+H** | Chegaraning qizil chizig'ini ko'rsatish / yashirish (cheklov baribir ishlaydi) |
 
 Har bir tugma bosilganda qisqa ovoz eshitiladi. Tugmalarni `%APPDATA%\AssistentAI\config.json` faylidagi `hotkey_start`, `hotkey_pause`, `hotkey_screenshot`, `hotkey_stop` qatorlarida o'zgartirish mumkin (masalan `"ctrl+alt+f9"`).
 
@@ -101,7 +102,9 @@ Ekranda shaxsiy ma'lumot (xabarlar, bank, boshqa oynalar) bo'lsa, AI'ga faqat ke
 
 1. **Ctrl+Alt+L** ni bosing (yoki **Sozlamalar → Chegarani belgilash**). Ekran xiralashadi.
 2. Sichqoncha bilan AI ishlashi kerak bo'lgan joyni to'rtburchak qilib chizing va qo'yib yuboring.
-3. Shu joy atrofida **qizil chiziq** paydo bo'ladi va u doim ko'rinib turadi.
+3. Shu joy atrofida 3 soniya **qizil chiziq** ko'rinadi, keyin u yashirinadi. Chiziqni xohlagan vaqtda **Ctrl+Alt+H** bilan ko'rsatish yoki yana yashirish mumkin (Sozlamalarda ham belgi bor).
+
+Chiziq yashirin bo'lsa ham chegara ishlayveradi: AI baribir faqat belgilangan joyni ko'radi va faqat shu yerda sichqonchani boshqaradi.
 
 Shundan keyin:
 
